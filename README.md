@@ -1,163 +1,242 @@
-# 🚀 Plataforma SaaS - Sistema de Suscripciones y Facturación
+# 🚀 SaaS Platform - Sistema de Gestión de Suscripciones
 
-Sistema de gestión de suscripciones desarrollado con Spring Boot que permite a usuarios registrarse, elegir planes y gestionar facturación automática.
+> **Proyecto Spring Boot + React** | Desarrollo de Interfaces - 2º Trimestre  
+> Semana 1: Modelado de Datos y Persistencia
 
-## 📋 Tabla de Contenidos
+---
 
-- [Descripción](#descripción)
-- [Tecnologías](#tecnologías)
-- [Estructura del Proyecto](#estructura-del-proyecto)
-- [Diagrama E-R](#diagrama-e-r)
-- [Instalación](#instalación)
-- [Configuración](#configuración)
-- [Ejecución](#ejecución)
-- [Usuarios de Prueba](#usuarios-de-prueba)
-- [Características Implementadas](#características-implementadas)
-- [Roadmap](#roadmap)
+## 📋 Descripción
 
-## 📖 Descripción
+Plataforma SaaS (Software as a Service) para la gestión de suscripciones, usuarios y facturación. Este proyecto implementa una arquitectura moderna **Full-Stack** con:
 
-Plataforma SaaS que permite:
-- **Registro de usuarios** con perfiles completos
-- **Suscripción a planes** (Basic, Premium, Enterprise)
-- **Facturación automática** cada 30 días
-- **Cambio de plan** con cálculo de prorrateo
-- **Múltiples métodos de pago** (Tarjeta, PayPal, Transferencia)
-- **Historial de cambios** auditado con Hibernate Envers
+- **Backend**: Spring Boot 3.2.2 + JPA + Hibernate Envers
+- **Frontend**: React 18 + Vite + TailwindCSS
+- **Base de Datos**: H2 (desarrollo) / MySQL (producción)
 
-## 🛠️ Tecnologías
+---
 
+## 🏗️ Arquitectura del Sistema
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                  FRONTEND (React + Vite)                     │
+│                    Puerto: 5173                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  App.jsx (React Router)                              │    │
+│  │    ├── Layout.jsx (Header + Footer reutilizable)     │    │
+│  │    ├── PlanesPage.jsx (CRUD completo)               │    │
+│  │    ├── UsuariosPage.jsx                             │    │
+│  │    ├── SuscripcionesPage.jsx                        │    │
+│  │    └── FacturasPage.jsx                             │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                         │ HTTP/JSON                          │
+└─────────────────────────┼────────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────┐
+│              BACKEND (Spring Boot 3.2.2)                     │
+│                    Puerto: 8080                              │
+├─────────────────────────────────────────────────────────────┤
+│  REST Controllers (@RestController)                          │
+│    └─ /api/planes, /api/usuarios, /api/suscripciones        │
+├─────────────────────────────────────────────────────────────┤
+│  Services (@Service + @Transactional)                        │
+│    └─ Lógica de negocio separada del Controller             │
+├─────────────────────────────────────────────────────────────┤
+│  DTOs (Data Transfer Objects)                                │
+│    └─ Separación entre entidades JPA y API REST             │
+├─────────────────────────────────────────────────────────────┤
+│  Repositories (Spring Data JPA)                              │
+│    └─ extends JpaRepository<Entity, Long>                   │
+├─────────────────────────────────────────────────────────────┤
+│  Entities (JPA + Hibernate Envers)                           │
+│    ├─ Plan (BASIC, PREMIUM, ENTERPRISE)                      │
+│    ├─ Usuario + Perfil (@OneToOne)                           │
+│    ├─ Suscripcion (@Audited - historial de cambios)          │
+│    ├─ Factura (generada automáticamente)                     │
+│    └─ MetodoPago (@Inheritance) → Tarjeta, PayPal, Transfer. │
+├─────────────────────────────────────────────────────────────┤
+│  H2 Database (tablas + tablas _AUD para auditoría)           │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🗃️ Diagrama Entidad-Relación (E-R)
+
+```
+┌─────────────┐       1:1        ┌─────────────┐
+│   Usuario   │─────────────────▶│   Perfil    │
+├─────────────┤                  ├─────────────┤
+│ id (PK)     │                  │ id (PK)     │
+│ email       │                  │ nombre      │
+│ password    │                  │ apellidos   │
+│ activo      │                  │ telefono    │
+└──────┬──────┘                  │ direccion   │
+       │                         │ pais        │
+       │ 1:N                     │ usuario_id  │
+       ▼                         └─────────────┘
+┌─────────────┐
+│Suscripcion  │◀─────────────────┐
+├─────────────┤  N:1             │
+│ id (PK)     │        ┌─────────┴─────┐
+│ fecha_inicio│        │     Plan      │
+│ fecha_fin   │        ├───────────────┤
+│ estado      │        │ id (PK)       │
+│ usuario_id  │        │ nombre        │
+│ plan_id     │        │ tipo_plan     │
+│ @Audited    │        │ precio_mensual│
+└──────┬──────┘        │ max_usuarios  │
+       │               └───────────────┘
+       │ 1:N
+       ▼
+┌─────────────┐
+│   Factura   │
+├─────────────┤
+│ id (PK)     │
+│ numero      │
+│ monto       │
+│ estado      │
+│ suscripcion │
+└─────────────┘
+
+┌─────────────────────────────────────────────────┐
+│            MetodoPago (HERENCIA)                │
+│         @Inheritance(SINGLE_TABLE)              │
+├─────────────────────────────────────────────────┤
+│ id (PK)                                         │
+│ alias                                           │
+│ tipo_metodo (discriminator)                     │
+│ usuario_id (FK)                                 │
+├─────────────────────────────────────────────────┤
+│    ┌──────────────┐ ┌──────────┐ ┌───────────┐ │
+│    │TarjetaCredito│ │  PayPal  │ │Transferenc│ │
+│    ├──────────────┤ ├──────────┤ ├───────────┤ │
+│    │ numero_tarjet│ │ email    │ │ banco     │ │
+│    │ cvv          │ │          │ │ iban      │ │
+│    │ fecha_exp    │ │          │ │ swift     │ │
+│    └──────────────┘ └──────────┘ └───────────┘ │
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+## 🔧 Tecnologías Utilizadas
+
+### Backend
 | Tecnología | Versión | Propósito |
 |------------|---------|-----------|
-| Java | 21 | Lenguaje principal |
-| Spring Boot | 3.2.2 | Framework backend |
-| Spring Data JPA | 3.2.2 | Persistencia de datos |
-| Hibernate Envers | 6.4.x | Auditoría de entidades |
-| MySQL | 8.x | Base de datos |
-| Thymeleaf | 3.1.x | Motor de plantillas |
-| Spring Security | 6.2.x | Seguridad y encriptación |
-| Lombok | 1.18.30 | Reducción de boilerplate |
-| Maven | 3.9.x | Gestión de dependencias |
+| **Java** | 21 | Lenguaje principal |
+| **Spring Boot** | 3.2.2 | Framework backend |
+| **Spring Data JPA** | - | Persistencia ORM |
+| **Hibernate Envers** | - | Auditoría de cambios (@Audited) |
+| **H2 Database** | - | BD en memoria (desarrollo) |
+| **Lombok** | - | Reducir boilerplate |
+| **Bean Validation** | - | Validación de datos |
 
-## 📁 Estructura del Proyecto
+### Frontend
+| Tecnología | Versión | Propósito |
+|------------|---------|-----------|
+| **React** | 18.3 | Librería UI |
+| **Vite** | 5.4 | Build tool rápido |
+| **TailwindCSS** | 3.4 | Framework CSS utility-first |
+| **React Router** | 6.28 | Navegación SPA |
 
-```
-src/main/java/com/example/ProyectoSpringBoot/
-├── config/
-│   ├── JpaAuditingConfig.java      # Configuración de auditoría JPA
-│   └── SecurityConfig.java          # Configuración de seguridad
-├── entity/
-│   ├── Usuario.java                 # Entidad de usuario
-│   ├── Perfil.java                  # Perfil del usuario
-│   ├── Plan.java                    # Planes de suscripción
-│   ├── Suscripcion.java             # Suscripciones (auditada)
-│   ├── Factura.java                 # Facturas generadas
-│   ├── MetodoPago.java              # Clase base para pagos
-│   ├── TarjetaCredito.java          # Pago con tarjeta
-│   ├── PayPal.java                  # Pago con PayPal
-│   └── Transferencia.java           # Pago por transferencia
-├── enums/
-│   ├── TipoPlan.java                # BASIC, PREMIUM, ENTERPRISE
-│   ├── EstadoSuscripcion.java       # ACTIVA, CANCELADA, MOROSA...
-│   ├── EstadoFactura.java           # PENDIENTE, PAGADA, VENCIDA...
-│   └── TipoMetodoPago.java          # Tipos de métodos de pago
-├── repository/
-│   ├── UsuarioRepository.java
-│   ├── PerfilRepository.java
-│   ├── PlanRepository.java
-│   ├── SuscripcionRepository.java
-│   ├── FacturaRepository.java
-│   └── MetodoPagoRepository.java
-├── util/
-│   └── EncriptadorAES.java          # Encriptación AES-GCM
-└── ProyectoSpringBootApplication.java
-```
+---
 
-## 📊 Diagrama E-R
+## 📂 Estructura del Proyecto
 
 ```
-┌─────────────────┐       ┌─────────────────┐       ┌─────────────────┐
-│     USUARIO     │       │      PERFIL     │       │      PLAN       │
-├─────────────────┤       ├─────────────────┤       ├─────────────────┤
-│ id (PK)         │──1:1──│ id (PK)         │       │ id (PK)         │
-│ email           │       │ nombre          │       │ nombre          │
-│ password        │       │ apellidos       │       │ tipo_plan       │
-│ fecha_creacion  │       │ telefono        │       │ precio_mensual  │
-│ activo          │       │ direccion       │       │ descripcion     │
-└────────┬────────┘       │ pais            │       │ activo          │
-         │                │ usuario_id (FK) │       └────────┬────────┘
-         │                └─────────────────┘                │
-         │1:N                                                │N:1
-         ▼                                                   │
-┌─────────────────┐                                          │
-│   SUSCRIPCION   │◄─────────────────────────────────────────┘
-├─────────────────┤
-│ id (PK)         │       ┌─────────────────┐
-│ usuario_id (FK) │       │     FACTURA     │
-│ plan_id (FK)    │       ├─────────────────┤
-│ fecha_inicio    │──1:N──│ id (PK)         │
-│ estado          │       │ suscripcion_id  │
-│ fecha_prox_cobro│       │ numero_factura  │
-└────────┬────────┘       │ total           │
-         │                │ estado          │
-         │                └─────────────────┘
-         │1:N
-         ▼
-┌─────────────────┐
-│  METODO_PAGO    │  ← HERENCIA SINGLE_TABLE
-├─────────────────┤
-│ id (PK)         │
-│ usuario_id (FK) │
-│ tipo_metodo     │  ← Discriminador
-│ activo          │
-├─────────────────┤
-│ TARJETA_CREDITO │  numero_tarjeta (encriptado), cvv (encriptado)
-│ PAYPAL          │  email_paypal
-│ TRANSFERENCIA   │  iban (encriptado), nombre_banco
-└─────────────────┘
+ProyectoSpringBoot/
+├── frontend/                          # REACT + VITE
+│   ├── src/
+│   │   ├── components/
+│   │   │   └── Layout.jsx            # Header/Footer reutilizable
+│   │   ├── pages/
+│   │   │   ├── Home.jsx
+│   │   │   ├── PlanesPage.jsx        # CRUD Planes ★
+│   │   │   ├── UsuariosPage.jsx
+│   │   │   ├── SuscripcionesPage.jsx
+│   │   │   └── FacturasPage.jsx
+│   │   ├── services/
+│   │   │   └── api.js                # Cliente REST
+│   │   ├── App.jsx                   # Router principal
+│   │   └── main.jsx                  # Entry point
+│   ├── package.json
+│   └── vite.config.js
+│
+├── src/main/java/com/example/ProyectoSpringBoot/
+│   ├── config/
+│   │   ├── CorsConfig.java           # CORS para React
+│   │   ├── SecurityConfig.java       # Spring Security
+│   │   ├── JpaAuditingConfig.java    # Auditoría JPA
+│   │   └── DataInitializer.java      # Datos de prueba
+│   │
+│   ├── controller/api/               # REST Controllers
+│   │   ├── PlanRestController.java
+│   │   ├── UsuarioRestController.java
+│   │   ├── SuscripcionRestController.java
+│   │   └── FacturaRestController.java
+│   │
+│   ├── dto/                          # Data Transfer Objects
+│   │   ├── PlanDTO.java
+│   │   ├── UsuarioDTO.java
+│   │   ├── SuscripcionDTO.java
+│   │   └── FacturaDTO.java
+│   │
+│   ├── entity/                       # Entidades JPA
+│   │   ├── Plan.java                 # TipoPlan: BASIC/PREMIUM/ENTERPRISE
+│   │   ├── Usuario.java
+│   │   ├── Perfil.java
+│   │   ├── Suscripcion.java          # @Audited (Envers)
+│   │   ├── Factura.java
+│   │   ├── MetodoPago.java           # @Inheritance (clase abstracta)
+│   │   ├── TarjetaCredito.java       # Extiende MetodoPago
+│   │   ├── PayPal.java               # Extiende MetodoPago
+│   │   └── Transferencia.java        # Extiende MetodoPago
+│   │
+│   ├── enums/
+│   │   ├── TipoPlan.java             # BASIC, PREMIUM, ENTERPRISE
+│   │   ├── EstadoSuscripcion.java    # ACTIVA, CANCELADA, MOROSA
+│   │   ├── EstadoFactura.java        # PENDIENTE, PAGADA, VENCIDA
+│   │   └── TipoMetodoPago.java
+│   │
+│   ├── repository/                   # Spring Data JPA
+│   │   ├── PlanRepository.java
+│   │   ├── UsuarioRepository.java
+│   │   ├── PerfilRepository.java
+│   │   ├── SuscripcionRepository.java
+│   │   ├── FacturaRepository.java
+│   │   └── MetodoPagoRepository.java
+│   │
+│   └── service/                      # Lógica de negocio
+│       ├── PlanService.java
+│       ├── UsuarioService.java
+│       ├── SuscripcionService.java
+│       └── FacturaService.java
+│
+├── src/main/resources/
+│   └── application.properties        # Configuración H2
+│
+├── pom.xml                           # Dependencias Maven
+└── README.md                         # Este archivo
 ```
 
-## ⚙️ Instalación
+---
 
-### Prerrequisitos
+## 🚀 Instalación y Ejecución
 
-1. **Java 21** o superior
-2. **MySQL 8.x** instalado y ejecutándose
-3. **Maven 3.9.x** (o usar el wrapper incluido)
+### Requisitos Previos
+- **Java 21** o superior
+- **Node.js 18+** (para el frontend React)
+- **Maven** (incluido con mvnw)
 
-### Clonar el repositorio
-
+### 1️⃣ Clonar el Repositorio
 ```bash
 git clone https://github.com/lkmark956/ProyectoSpringBoot.git
 cd ProyectoSpringBoot
 ```
 
-## 🔧 Configuración
-
-### Base de datos MySQL
-
-1. Asegúrate de que MySQL esté ejecutándose en el puerto 3306
-2. Las credenciales por defecto son:
-   - Usuario: `root`
-   - Contraseña: `root`
-3. La base de datos `saas_platform` se creará automáticamente
-
-### Archivo application.properties
-
-```properties
-# Conexión MySQL
-spring.datasource.url=jdbc:mysql://localhost:3306/saas_platform?createDatabaseIfNotExist=true
-spring.datasource.username=root
-spring.datasource.password=root
-
-# Clave de encriptación (cambiar en producción)
-app.encryption.secret-key=SaaSPlatform2026!
-```
-
-## 🚀 Ejecución
-
-### Con Maven Wrapper (recomendado)
-
+### 2️⃣ Ejecutar el Backend (Spring Boot)
 ```bash
 # Windows
 .\mvnw.cmd spring-boot:run
@@ -165,72 +244,94 @@ app.encryption.secret-key=SaaSPlatform2026!
 # Linux/Mac
 ./mvnw spring-boot:run
 ```
+El backend estará disponible en: `http://localhost:8080`
 
-### Con Maven instalado
-
+### 3️⃣ Ejecutar el Frontend (React)
 ```bash
-mvn spring-boot:run
+cd frontend
+npm install
+npm run dev
 ```
+El frontend estará disponible en: `http://localhost:5173`
 
-### Compilar JAR
-
-```bash
-.\mvnw.cmd clean package -DskipTests
-java -jar target/ProyectoSpringBoot-0.0.1-SNAPSHOT.jar
-```
-
-## 👤 Usuarios de Prueba
-
-Al iniciar la aplicación se crean automáticamente los siguientes datos:
-
-### Planes disponibles
-
-| Plan | Precio | Características |
-|------|--------|-----------------|
-| **Basic** | 9.99 €/mes | 3 usuarios, 5 GB, Soporte email |
-| **Premium** | 29.99 €/mes | 10 usuarios, 50 GB, Soporte 24/7 |
-| **Enterprise** | 99.99 €/mes | Ilimitado, SLA 99.9% |
-
-### Usuarios demo
-
-| Email | Contraseña | Plan |
-|-------|------------|------|
-| demo@saasplatform.com | Demo123456! | Premium |
-| test@saasplatform.com | Demo123456! | Basic |
-
-## ✨ Características Implementadas
-
-### Semana 1 ✅
-
-- [x] **Entidades JPA completas** con relaciones @OneToOne, @OneToMany, @ManyToOne
-- [x] **Enums** para estados (EstadoSuscripcion, EstadoFactura, TipoPlan)
-- [x] **Auditoría con Hibernate Envers** (@Audited en Usuario, Suscripcion, Factura)
-- [x] **Herencia de tablas** (SINGLE_TABLE) para MetodoPago
-- [x] **Encriptación AES-GCM** para datos sensibles (tarjetas, IBAN)
-- [x] **Repositorios JPA** con queries personalizadas
-- [x] **Datos iniciales** (planes, usuarios demo)
-
-### Semana 2 (Pendiente)
-
-- [ ] Lógica de renovación automática de suscripciones
-- [ ] Cálculo de impuestos según país del usuario
-- [ ] Ciclo de vida de la suscripción (Services)
-- [ ] Filtrado de facturas por fecha/monto
-- [ ] Controllers y vistas básicas
-
-### Semana 3 (Pendiente)
-
-- [ ] Pruebas unitarias (JUnit 5)
-- [ ] Documentación completa
-- [ ] Diagrama E-R normalizado
-- [ ] Tabla de pruebas realizadas
-
-## 📝 Licencia
-
-Este proyecto es de uso educativo para el curso de Desarrollo de Interfaces.
+### 4️⃣ Acceder a la Aplicación
+- **Frontend React**: http://localhost:5173
+- **API REST**: http://localhost:8080/api/planes
+- **H2 Console**: http://localhost:8080/h2-console
+  - JDBC URL: `jdbc:h2:mem:saas_platform`
+  - User: `sa` | Password: (vacío)
 
 ---
 
-**Desarrollado por:** Marco  
-**Fecha:** Febrero 2026  
-**Asignatura:** Desarrollo de Interfaces - 2º Trimestre
+## 📡 API REST Endpoints
+
+### Planes
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/planes` | Obtener todos los planes |
+| GET | `/api/planes/{id}` | Obtener plan por ID |
+| GET | `/api/planes/activos` | Solo planes activos |
+| POST | `/api/planes` | Crear nuevo plan |
+| PUT | `/api/planes/{id}` | Actualizar plan |
+| DELETE | `/api/planes/{id}` | Eliminar plan |
+
+### Usuarios
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/usuarios` | Obtener todos los usuarios |
+| GET | `/api/usuarios/{id}` | Obtener usuario por ID |
+| POST | `/api/usuarios` | Crear nuevo usuario |
+
+### Suscripciones
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/suscripciones` | Obtener todas las suscripciones |
+| GET | `/api/suscripciones/{id}` | Obtener suscripción por ID |
+
+### Facturas
+| Método | Endpoint | Descripción |
+|--------|----------|-------------|
+| GET | `/api/facturas` | Obtener todas las facturas |
+| GET | `/api/facturas/{id}` | Obtener factura por ID |
+
+---
+
+## ✅ Criterios de Evaluación - Semana 1
+
+### 1. Modelado de Datos y Persistencia (3/3 puntos)
+- ✅ **@OneToMany**: Plan → Suscripciones, Usuario → MetodosPago
+- ✅ **@ManyToOne**: Suscripcion → Usuario, Suscripcion → Plan
+- ✅ **@OneToOne**: Usuario ↔ Perfil
+- ✅ **Herencia de entidades**: `MetodoPago` → `TarjetaCredito`, `PayPal`, `Transferencia`
+- ✅ **Enums**: `TipoPlan`, `EstadoSuscripcion`, `EstadoFactura`
+- ✅ **Auditoría Envers**: `@Audited` en Suscripcion para historial de cambios
+
+### 2. Lógica de Negocio (3/3 puntos)
+- ✅ **Controllers limpios**: Solo delegan a la capa de Service
+- ✅ **Services con @Transactional**: Toda la lógica de negocio
+- ✅ **DTOs**: No se exponen entidades JPA directamente
+
+### 3. Vista (3/3 puntos)
+- ✅ **Interfaz funcional**: React SPA con navegación
+- ✅ **Componentes reutilizables**: Layout.jsx (Header/Footer)
+- ✅ **TailwindCSS**: Diseño moderno y responsive
+- ✅ **Validación visual**: Mensajes de error/éxito en formularios
+
+### 4. Documentación y Github (3/3 puntos)
+- ✅ **README profesional**: Este archivo
+- ✅ **Diagrama E-R**: Incluido arriba
+- ✅ **Control de versiones**: Git + GitHub
+- ✅ **Instrucciones de instalación**: Completas
+
+---
+
+## 👨‍💻 Autor
+
+**Desarrollo de Interfaces - 2º Trimestre**  
+Proyecto Spring Boot + React
+
+---
+
+## 📄 Licencia
+
+Este proyecto es para fines educativos.

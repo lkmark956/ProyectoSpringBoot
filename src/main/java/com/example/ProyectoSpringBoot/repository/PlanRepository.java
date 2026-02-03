@@ -17,6 +17,7 @@ public interface PlanRepository extends JpaRepository<Plan, Long> {
     // Por tipo y nombre
     Optional<Plan> findByTipoPlan(TipoPlan tipoPlan);
     Optional<Plan> findByNombre(String nombre);
+    boolean existsByNombre(String nombre);
 
     // Planes activos
     List<Plan> findByActivoTrue();

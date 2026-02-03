@@ -1,0 +1,13 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Estilos personalizados */
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Transiciones suaves para todos los elementos interactivos */
+button, a, input, select, textarea {
+  transition: all 0.3s ease;
+}
