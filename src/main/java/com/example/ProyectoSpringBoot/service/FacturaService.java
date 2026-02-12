@@ -44,6 +44,46 @@ public class FacturaService {
     }
 
     /**
+     * Filtrar facturas por rango de fechas
+     */
+    @Transactional(readOnly = true)
+    public List<FacturaDTO> findByFechaEmisionBetween(java.time.LocalDate inicio, java.time.LocalDate fin) {
+        return facturaRepository.findByFechaEmisionBetween(inicio, fin).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Filtrar facturas por rango de monto
+     */
+    @Transactional(readOnly = true)
+    public List<FacturaDTO> findByTotalBetween(java.math.BigDecimal min, java.math.BigDecimal max) {
+        return facturaRepository.findByTotalBetween(min, max).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Obtener facturas de un usuario
+     */
+    @Transactional(readOnly = true)
+    public List<FacturaDTO> findByUsuarioId(Long usuarioId) {
+        return facturaRepository.findByUsuarioId(usuarioId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Obtener facturas vencidas
+     */
+    @Transactional(readOnly = true)
+    public List<FacturaDTO> findVencidas() {
+        return facturaRepository.findVencidas(java.time.LocalDate.now()).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Marcar factura como pagada
      */
     public Optional<FacturaDTO> marcarComoPagada(Long id) {
