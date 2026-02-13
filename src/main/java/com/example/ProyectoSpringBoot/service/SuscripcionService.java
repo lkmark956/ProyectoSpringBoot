@@ -1,10 +1,13 @@
 package com.example.ProyectoSpringBoot.service;
 
 import com.example.ProyectoSpringBoot.dto.SuscripcionDTO;
+import com.example.ProyectoSpringBoot.entity.Factura;
 import com.example.ProyectoSpringBoot.entity.Plan;
 import com.example.ProyectoSpringBoot.entity.Suscripcion;
 import com.example.ProyectoSpringBoot.entity.Usuario;
+import com.example.ProyectoSpringBoot.enums.EstadoFactura;
 import com.example.ProyectoSpringBoot.enums.EstadoSuscripcion;
+import com.example.ProyectoSpringBoot.repository.FacturaRepository;
 import com.example.ProyectoSpringBoot.repository.PlanRepository;
 import com.example.ProyectoSpringBoot.repository.SuscripcionRepository;
 import com.example.ProyectoSpringBoot.repository.UsuarioRepository;
@@ -12,6 +15,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -27,6 +33,7 @@ public class SuscripcionService {
     private final SuscripcionRepository suscripcionRepository;
     private final UsuarioRepository usuarioRepository;
     private final PlanRepository planRepository;
+    private final FacturaRepository facturaRepository;
 
     @Transactional(readOnly = true)
     public List<SuscripcionDTO> findAll() {
@@ -62,18 +69,61 @@ public class SuscripcionService {
             return Optional.empty();
         }
 
+        // Cancelar todas las suscripciones activas del usuario (solo 1 plan a la vez)
+        List<Suscripcion> susActivas = suscripcionRepository.findByUsuarioId(dto.getUsuarioId()).stream()
+                .filter(s -> s.getEstado() == EstadoSuscripcion.ACTIVA)
+                .toList();
+        for (Suscripcion sus : susActivas) {
+            sus.setEstado(EstadoSuscripcion.CANCELADA);
+            suscripcionRepository.save(sus);
+        }
+
+        LocalDate fechaInicio = dto.getFechaInicio() != null ? dto.getFechaInicio() : LocalDate.now();
+
         Suscripcion suscripcion = Suscripcion.builder()
                 .usuario(usuario.get())
                 .plan(plan.get())
-                .fechaInicio(dto.getFechaInicio())
+                .fechaInicio(fechaInicio)
                 .fechaFin(dto.getFechaFin())
+                .fechaProximoCobro(fechaInicio.plusMonths(1))
                 .estado(dto.getEstado() != null ? dto.getEstado() : EstadoSuscripcion.ACTIVA)
                 .renovacionAutomatica(dto.getRenovacionAutomatica() != null ? dto.getRenovacionAutomatica() : true)
                 .precioActual(dto.getPrecioActual() != null ? dto.getPrecioActual() : plan.get().getPrecioMensual())
                 .build();
 
         Suscripcion saved = suscripcionRepository.save(suscripcion);
+
+        // Crear factura automáticamente
+        crearFactura(saved);
+
         return Optional.of(toDTO(saved));
+    }
+
+    /**
+     * Genera una factura para la suscripción
+     */
+    private void crearFactura(Suscripcion suscripcion) {
+        BigDecimal subtotal = suscripcion.getPrecioActual();
+        BigDecimal porcentajeImpuestos = new BigDecimal("21.00");
+        BigDecimal montoImpuestos = subtotal.multiply(porcentajeImpuestos).divide(new BigDecimal("100"), 2, RoundingMode.HALF_UP);
+        BigDecimal total = subtotal.add(montoImpuestos);
+
+        String numeroFactura = "FAC-" + System.currentTimeMillis();
+
+        Factura factura = Factura.builder()
+                .numeroFactura(numeroFactura)
+                .fechaEmision(LocalDate.now())
+                .fechaVencimiento(LocalDate.now().plusDays(30))
+                .subtotal(subtotal)
+                .porcentajeImpuestos(porcentajeImpuestos)
+                .montoImpuestos(montoImpuestos)
+                .total(total)
+                .estado(EstadoFactura.PENDIENTE)
+                .concepto("Suscripción " + suscripcion.getPlan().getNombre())
+                .suscripcion(suscripcion)
+                .build();
+
+        facturaRepository.save(factura);
     }
 
     public Optional<SuscripcionDTO> update(Long id, SuscripcionDTO dto) {

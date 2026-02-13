@@ -1,378 +1,110 @@
-import { useState, useEffect } from 'react';
-import { FileText, Filter, Calendar, DollarSign, CheckCircle, Clock, AlertTriangle, X } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
 import { facturasApi } from '../services/api';
 
-function FacturasPage() {
+const FacturasPage = ({ userData }) => {
   const [facturas, setFacturas] = useState([]);
-  const [impuestos, setImpuestos] = useState({});
   const [loading, setLoading] = useState(true);
-  const [filtros, setFiltros] = useState({
-    tipo: 'todas', // todas, fecha, monto, estado
-    fechaInicio: '',
-    fechaFin: '',
-    montoMin: '',
-    montoMax: '',
-    estado: ''
-  });
-  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [filtro, setFiltro] = useState('todas');
+
+  const cargarFacturas = useCallback(async () => {
+    if (!userData?.id) return;
+    setLoading(true);
+    try {
+      const data = await facturasApi.getByUsuario(userData.id);
+      setFacturas(data);
+    } catch (err) {
+      console.error('Error al cargar facturas:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [userData?.id]);
 
   useEffect(() => {
-    cargarDatos();
-  }, []);
+    cargarFacturas();
+  }, [cargarFacturas]);
 
-  const cargarDatos = async () => {
-    try {
-      setLoading(true);
-      const [facturasData, impuestosData] = await Promise.all([
-        facturasApi.getAll(),
-        facturasApi.getImpuestos()
-      ]);
-      setFacturas(facturasData);
-      setImpuestos(impuestosData);
-    } catch (error) {
-      console.error('Error cargando datos:', error);
-    } finally {
-      setLoading(false);
+  const formatPrecio = (p) => new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(p);
+  const formatFecha = (f) => f ? new Date(f).toLocaleDateString('es-ES') : '-';
+
+  const filtradas = filtro === 'todas' 
+    ? facturas 
+    : facturas.filter(f => f.estado === filtro);
+
+  const estadoColor = (e) => {
+    switch (e) {
+      case 'PAGADA': return 'bg-green-100 text-green-700';
+      case 'PENDIENTE': return 'bg-yellow-100 text-yellow-700';
+      case 'VENCIDA': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
     }
   };
 
-  const aplicarFiltros = async () => {
-    try {
-      setLoading(true);
-      let resultado;
-
-      switch (filtros.tipo) {
-        case 'fecha':
-          if (filtros.fechaInicio && filtros.fechaFin) {
-            resultado = await facturasApi.filtrarPorFecha(filtros.fechaInicio, filtros.fechaFin);
-          }
-          break;
-        case 'monto':
-          if (filtros.montoMin && filtros.montoMax) {
-            resultado = await facturasApi.filtrarPorMonto(filtros.montoMin, filtros.montoMax);
-          }
-          break;
-        case 'estado':
-          if (filtros.estado) {
-            resultado = await facturasApi.getByEstado(filtros.estado);
-          }
-          break;
-        case 'vencidas':
-          resultado = await facturasApi.getVencidas();
-          break;
-        default:
-          resultado = await facturasApi.getAll();
-      }
-
-      if (resultado) setFacturas(resultado);
-    } catch (error) {
-      console.error('Error aplicando filtros:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const limpiarFiltros = () => {
-    setFiltros({
-      tipo: 'todas',
-      fechaInicio: '',
-      fechaFin: '',
-      montoMin: '',
-      montoMax: '',
-      estado: ''
-    });
-    cargarDatos();
-  };
-
-  const marcarComoPagada = async (id) => {
-    try {
-      await facturasApi.marcarPagada(id);
-      cargarDatos();
-    } catch (error) {
-      console.error('Error marcando factura:', error);
-    }
-  };
-
-  const getEstadoBadge = (estado) => {
-    const estilos = {
-      PAGADA: 'bg-green-100 text-green-700',
-      PENDIENTE: 'bg-yellow-100 text-yellow-700',
-      VENCIDA: 'bg-red-100 text-red-700',
-      CANCELADA: 'bg-gray-100 text-gray-700'
-    };
-    const iconos = {
-      PAGADA: <CheckCircle className="w-3 h-3" />,
-      PENDIENTE: <Clock className="w-3 h-3" />,
-      VENCIDA: <AlertTriangle className="w-3 h-3" />,
-      CANCELADA: <X className="w-3 h-3" />
-    };
+  if (loading) {
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${estilos[estado] || 'bg-gray-100'}`}>
-        {iconos[estado]} {estado}
-      </span>
+      <div className="flex items-center justify-center py-20">
+        <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
     );
-  };
-
-  const formatearMoneda = (valor) => {
-    return new Intl.NumberFormat('es-ES', { style: 'currency', currency: 'EUR' }).format(valor || 0);
-  };
-
-  const formatearFecha = (fecha) => {
-    if (!fecha) return '-';
-    return new Date(fecha).toLocaleDateString('es-ES');
-  };
-
-  // Calcular totales
-  const totales = facturas.reduce((acc, f) => ({
-    subtotal: acc.subtotal + (parseFloat(f.subtotal) || 0),
-    impuestos: acc.impuestos + (parseFloat(f.montoImpuestos) || 0),
-    total: acc.total + (parseFloat(f.total) || 0)
-  }), { subtotal: 0, impuestos: 0, total: 0 });
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-[#0081C8] rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-gray-900">Facturación</span>
-            </div>
-            <button
-              onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0081C8] text-white rounded-lg hover:bg-[#006ba8] transition-colors"
-            >
-              <Filter className="w-4 h-4" />
-              Filtros
-            </button>
-          </div>
+    <div className="max-w-4xl mx-auto px-4 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-lg font-semibold text-gray-900">Facturas</h1>
+        
+        <select
+          value={filtro}
+          onChange={(e) => setFiltro(e.target.value)}
+          className="px-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+        >
+          <option value="todas">Todas</option>
+          <option value="PENDIENTE">Pendientes</option>
+          <option value="PAGADA">Pagadas</option>
+          <option value="VENCIDA">Vencidas</option>
+        </select>
+      </div>
+
+      {filtradas.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border border-gray-100">
+          <svg className="w-10 h-10 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <p className="text-gray-500 text-sm">No hay facturas</p>
         </div>
-      </header>
-
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Panel de Filtros */}
-        {mostrarFiltros && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-            <h3 className="text-lg font-semibold mb-4">Filtrar Facturas</h3>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Tipo de filtro */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Filtrar por</label>
-                <select
-                  value={filtros.tipo}
-                  onChange={(e) => setFiltros({ ...filtros, tipo: e.target.value })}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0081C8]"
-                >
-                  <option value="todas">Todas</option>
-                  <option value="fecha">Rango de fechas</option>
-                  <option value="monto">Rango de monto</option>
-                  <option value="estado">Estado</option>
-                  <option value="vencidas">Solo vencidas</option>
-                </select>
-              </div>
-
-              {/* Filtros de fecha */}
-              {filtros.tipo === 'fecha' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Desde</label>
-                    <input
-                      type="date"
-                      value={filtros.fechaInicio}
-                      onChange={(e) => setFiltros({ ...filtros, fechaInicio: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0081C8]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
-                    <input
-                      type="date"
-                      value={filtros.fechaFin}
-                      onChange={(e) => setFiltros({ ...filtros, fechaFin: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0081C8]"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Filtros de monto */}
-              {filtros.tipo === 'monto' && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Monto mínimo</label>
-                    <input
-                      type="number"
-                      value={filtros.montoMin}
-                      onChange={(e) => setFiltros({ ...filtros, montoMin: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0081C8]"
-                      placeholder="0"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Monto máximo</label>
-                    <input
-                      type="number"
-                      value={filtros.montoMax}
-                      onChange={(e) => setFiltros({ ...filtros, montoMax: e.target.value })}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0081C8]"
-                      placeholder="1000"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Filtro de estado */}
-              {filtros.tipo === 'estado' && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Estado</label>
-                  <select
-                    value={filtros.estado}
-                    onChange={(e) => setFiltros({ ...filtros, estado: e.target.value })}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-[#0081C8]"
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="PENDIENTE">Pendiente</option>
-                    <option value="PAGADA">Pagada</option>
-                    <option value="VENCIDA">Vencida</option>
-                    <option value="CANCELADA">Cancelada</option>
-                  </select>
-                </div>
-              )}
-
-              {/* Botones */}
-              <div className="flex items-end gap-2">
-                <button
-                  onClick={aplicarFiltros}
-                  className="px-4 py-2 bg-[#0081C8] text-white rounded-lg hover:bg-[#006ba8]"
-                >
-                  Aplicar
-                </button>
-                <button
-                  onClick={limpiarFiltros}
-                  className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
-                >
-                  Limpiar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Resumen de totales */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-lg">
-                <DollarSign className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Subtotal</p>
-                <p className="text-xl font-bold">{formatearMoneda(totales.subtotal)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-50 rounded-lg">
-                <Calendar className="w-5 h-5 text-orange-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Impuestos</p>
-                <p className="text-xl font-bold">{formatearMoneda(totales.impuestos)}</p>
-              </div>
-            </div>
-          </div>
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-50 rounded-lg">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-              </div>
-              <div>
-                <p className="text-sm text-gray-500">Total</p>
-                <p className="text-xl font-bold text-green-600">{formatearMoneda(totales.total)}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tabla de impuestos por país */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold">Impuestos por País (IVA/VAT)</h3>
-          </div>
-          <div className="p-4 overflow-x-auto">
-            <div className="flex flex-wrap gap-2">
-              {Object.entries(impuestos).map(([pais, porcentaje]) => (
-                <span key={pais} className="px-3 py-1 bg-gray-100 rounded-full text-sm">
-                  {pais}: <strong>{porcentaje}%</strong>
-                </span>
+      ) : (
+        <div className="border border-gray-200 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50">
+              <tr className="text-left text-gray-500">
+                <th className="px-4 py-3 font-medium">Factura</th>
+                <th className="px-4 py-3 font-medium">Fecha</th>
+                <th className="px-4 py-3 font-medium">Total</th>
+                <th className="px-4 py-3 font-medium">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {filtradas.map((f) => (
+                <tr key={f.id} className="hover:bg-gray-50">
+                  <td className="px-4 py-3 text-gray-900 font-medium">{f.numeroFactura}</td>
+                  <td className="px-4 py-3 text-gray-600">{formatFecha(f.fechaEmision)}</td>
+                  <td className="px-4 py-3 text-gray-900">{formatPrecio(f.total)}</td>
+                  <td className="px-4 py-3">
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${estadoColor(f.estado)}`}>
+                      {f.estado}
+                    </span>
+                  </td>
+                </tr>
               ))}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
+      )}
 
-        {/* Tabla de Facturas */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 className="text-lg font-semibold">Listado de Facturas ({facturas.length})</h3>
-          </div>
-          
-          {loading ? (
-            <div className="p-8 text-center text-gray-500">Cargando facturas...</div>
-          ) : facturas.length === 0 ? (
-            <div className="p-8 text-center text-gray-500">No hay facturas para mostrar</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nº Factura</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usuario</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Concepto</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Emisión</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Subtotal</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">IVA %</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Impuestos</th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Estado</th>
-                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Acciones</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {facturas.map((factura) => (
-                    <tr key={factura.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-sm">{factura.numeroFactura}</td>
-                      <td className="px-4 py-3 text-sm">{factura.usuarioNombre || '-'}</td>
-                      <td className="px-4 py-3 text-sm max-w-xs truncate">{factura.concepto}</td>
-                      <td className="px-4 py-3 text-sm">{formatearFecha(factura.fechaEmision)}</td>
-                      <td className="px-4 py-3 text-sm text-right">{formatearMoneda(factura.subtotal)}</td>
-                      <td className="px-4 py-3 text-sm text-right">{factura.porcentajeImpuestos}%</td>
-                      <td className="px-4 py-3 text-sm text-right">{formatearMoneda(factura.montoImpuestos)}</td>
-                      <td className="px-4 py-3 text-sm text-right font-semibold">{formatearMoneda(factura.total)}</td>
-                      <td className="px-4 py-3 text-center">{getEstadoBadge(factura.estado)}</td>
-                      <td className="px-4 py-3 text-center">
-                        {factura.estado === 'PENDIENTE' && (
-                          <button
-                            onClick={() => marcarComoPagada(factura.id)}
-                            className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200"
-                          >
-                            Marcar Pagada
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </main>
+      {filtradas.length > 0 && (
+        <p className="text-xs text-gray-400 mt-4 text-center">{filtradas.length} factura{filtradas.length !== 1 ? 's' : ''}</p>
+      )}
     </div>
   );
-}
+};
 
 export default FacturasPage;

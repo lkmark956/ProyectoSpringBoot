@@ -5,6 +5,12 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// API de Autenticación
+export const authApi = {
+  login: async (email, password) => (await api.post('/auth/login', { email, password })).data,
+  register: async (usuario) => (await api.post('/auth/register', usuario)).data,
+};
+
 export const usuariosApi = {
   getAll: async () => (await api.get('/usuarios')).data,
   getById: async (id) => (await api.get(`/usuarios/${id}`)).data,

@@ -79,6 +79,21 @@ public class UsuarioService {
         return usuarioRepository.existsByEmail(email);
     }
 
+    /**
+     * Autenticar usuario por email y password
+     */
+    @Transactional
+    public Optional<UsuarioDTO> authenticate(String email, String password) {
+        return usuarioRepository.findByEmail(email)
+                .filter(usuario -> usuario.getActivo())
+                .filter(usuario -> passwordEncoder.matches(password, usuario.getPassword()))
+                .map(usuario -> {
+                    usuario.setUltimoAcceso(java.time.LocalDateTime.now());
+                    usuarioRepository.save(usuario);
+                    return toDTO(usuario);
+                });
+    }
+
     // ===== CONVERSIONES Entity <-> DTO =====
 
     private UsuarioDTO toDTO(Usuario entity) {
