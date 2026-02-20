@@ -44,4 +44,8 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     @Query("SELECT u FROM Usuario u LEFT JOIN FETCH u.suscripciones WHERE u.id = :id")
     Optional<Usuario> findByIdConSuscripciones(@Param("id") Long id);
+    
+    // Todos los usuarios con perfil cargado
+    @Query("SELECT u FROM Usuario u LEFT JOIN FETCH u.perfil")
+    List<Usuario> findAllConPerfil();
 }

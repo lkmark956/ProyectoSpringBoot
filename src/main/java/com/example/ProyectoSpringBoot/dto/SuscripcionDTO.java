@@ -21,6 +21,7 @@ public class SuscripcionDTO {
     @NotNull(message = "El usuario es obligatorio")
     private Long usuarioId;
     private String usuarioNombre;
+    private String usuarioEmail;
     
     @NotNull(message = "El plan es obligatorio")
     private Long planId;

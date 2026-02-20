@@ -56,4 +56,8 @@ public interface FacturaRepository extends JpaRepository<Factura, Long> {
 
     @Query("SELECT COALESCE(SUM(f.total), 0) FROM Factura f WHERE f.estado = 'PENDIENTE'")
     BigDecimal sumTotalPendientes();
+    
+    // Todas con relaciones cargadas (usuario, perfil, plan)
+    @Query("SELECT f FROM Factura f JOIN FETCH f.suscripcion s JOIN FETCH s.usuario u LEFT JOIN FETCH u.perfil JOIN FETCH s.plan")
+    List<Factura> findAllConDetalles();
 }

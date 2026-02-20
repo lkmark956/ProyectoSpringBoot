@@ -26,7 +26,7 @@ public class FacturaService {
 
     @Transactional(readOnly = true)
     public List<FacturaDTO> findAll() {
-        return facturaRepository.findAll().stream()
+        return facturaRepository.findAllConDetalles().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -95,6 +95,20 @@ public class FacturaService {
         });
     }
 
+    /**
+     * Cambiar estado de factura
+     */
+    public Optional<FacturaDTO> cambiarEstado(Long id, EstadoFactura nuevoEstado) {
+        return facturaRepository.findById(id).map(factura -> {
+            factura.setEstado(nuevoEstado);
+            if (nuevoEstado == EstadoFactura.PAGADA) {
+                factura.setFechaPago(LocalDateTime.now());
+            }
+            Factura saved = facturaRepository.save(factura);
+            return toDTO(saved);
+        });
+    }
+
     public boolean delete(Long id) {
         if (facturaRepository.existsById(id)) {
             facturaRepository.deleteById(id);
@@ -107,10 +121,12 @@ public class FacturaService {
 
     private FacturaDTO toDTO(Factura entity) {
         String usuarioNombre = null;
+        String usuarioEmail = null;
         Long usuarioId = null;
         
         if (entity.getSuscripcion() != null && entity.getSuscripcion().getUsuario() != null) {
             usuarioId = entity.getSuscripcion().getUsuario().getId();
+            usuarioEmail = entity.getSuscripcion().getUsuario().getEmail();
             if (entity.getSuscripcion().getUsuario().getPerfil() != null) {
                 var perfil = entity.getSuscripcion().getUsuario().getPerfil();
                 usuarioNombre = perfil.getNombre();
@@ -126,6 +142,7 @@ public class FacturaService {
                 .suscripcionId(entity.getSuscripcion() != null ? entity.getSuscripcion().getId() : null)
                 .usuarioId(usuarioId)
                 .usuarioNombre(usuarioNombre)
+                .usuarioEmail(usuarioEmail)
                 .fechaEmision(entity.getFechaEmision())
                 .fechaVencimiento(entity.getFechaVencimiento())
                 .subtotal(entity.getSubtotal())

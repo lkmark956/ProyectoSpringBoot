@@ -14,8 +14,7 @@ function App() {
 
   const handleLogin = (data) => {
     setUserData(data);
-    const adminEmails = ['admin@admin.com', 'admin@ejemplo.com'];
-    const admin = adminEmails.includes(data.email?.toLowerCase());
+    const admin = data.email?.toLowerCase() === 'admin@admin.com';
     setIsAdmin(admin);
     setCurrentPage(admin ? 'admin' : 'planes');
   };

@@ -49,6 +49,7 @@ export const facturasApi = {
   filtrarPorMonto: async (min, max) => (await api.get(`/facturas/filtrar/monto?min=${min}&max=${max}`)).data,
   getVencidas: async () => (await api.get('/facturas/vencidas')).data,
   marcarPagada: async (id) => (await api.put(`/facturas/${id}/pagar`)).data,
+  cambiarEstado: async (id, estado) => (await api.put(`/facturas/${id}/estado/${estado}`)).data,
   getImpuestos: async () => (await api.get('/facturas/impuestos')).data,
   delete: async (id) => await api.delete(`/facturas/${id}`),
 };

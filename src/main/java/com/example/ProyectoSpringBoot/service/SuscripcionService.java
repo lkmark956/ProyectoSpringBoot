@@ -37,7 +37,7 @@ public class SuscripcionService {
 
     @Transactional(readOnly = true)
     public List<SuscripcionDTO> findAll() {
-        return suscripcionRepository.findAll().stream()
+        return suscripcionRepository.findAllConDetalles().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -165,13 +165,17 @@ public class SuscripcionService {
 
     private SuscripcionDTO toDTO(Suscripcion entity) {
         String usuarioNombre = null;
+        String usuarioEmail = null;
         
-        // Obtener nombre del perfil del usuario
-        if (entity.getUsuario() != null && entity.getUsuario().getPerfil() != null) {
-            var perfil = entity.getUsuario().getPerfil();
-            usuarioNombre = perfil.getNombre();
-            if (perfil.getApellidos() != null) {
-                usuarioNombre += " " + perfil.getApellidos();
+        // Obtener nombre del perfil del usuario y email
+        if (entity.getUsuario() != null) {
+            usuarioEmail = entity.getUsuario().getEmail();
+            if (entity.getUsuario().getPerfil() != null) {
+                var perfil = entity.getUsuario().getPerfil();
+                usuarioNombre = perfil.getNombre();
+                if (perfil.getApellidos() != null) {
+                    usuarioNombre += " " + perfil.getApellidos();
+                }
             }
         }
         
@@ -179,6 +183,7 @@ public class SuscripcionService {
                 .id(entity.getId())
                 .usuarioId(entity.getUsuario() != null ? entity.getUsuario().getId() : null)
                 .usuarioNombre(usuarioNombre)
+                .usuarioEmail(usuarioEmail)
                 .planId(entity.getPlan() != null ? entity.getPlan().getId() : null)
                 .planNombre(entity.getPlan() != null ? entity.getPlan().getNombre() : null)
                 .fechaInicio(entity.getFechaInicio())

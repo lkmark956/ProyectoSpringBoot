@@ -43,4 +43,8 @@ public interface SuscripcionRepository extends JpaRepository<Suscripcion, Long> 
     // Con relaciones cargadas
     @Query("SELECT s FROM Suscripcion s JOIN FETCH s.usuario JOIN FETCH s.plan WHERE s.estado = :estado")
     List<Suscripcion> findByEstadoConDetalles(@Param("estado") EstadoSuscripcion estado);
+    
+    // Todas con usuario, perfil y plan cargados
+    @Query("SELECT s FROM Suscripcion s JOIN FETCH s.usuario u LEFT JOIN FETCH u.perfil JOIN FETCH s.plan")
+    List<Suscripcion> findAllConDetalles();
 }

@@ -103,6 +103,18 @@ public class FacturaRestController {
     }
 
     /**
+     * PUT /api/facturas/{id}/estado/{estado} - Cambiar estado de factura
+     */
+    @PutMapping("/{id}/estado/{estado}")
+    public ResponseEntity<FacturaDTO> cambiarEstado(
+            @PathVariable Long id,
+            @PathVariable EstadoFactura estado) {
+        return facturaService.cambiarEstado(id, estado)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
      * GET /api/facturas/impuestos - Obtener tabla de impuestos por país
      */
     @GetMapping("/impuestos")

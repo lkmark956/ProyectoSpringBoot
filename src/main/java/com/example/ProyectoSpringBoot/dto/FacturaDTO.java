@@ -21,6 +21,7 @@ public class FacturaDTO {
     private Long suscripcionId;
     private Long usuarioId;
     private String usuarioNombre;
+    private String usuarioEmail;
     private LocalDate fechaEmision;
     private LocalDate fechaVencimiento;
     private BigDecimal subtotal;

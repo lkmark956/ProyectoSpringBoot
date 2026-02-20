@@ -27,7 +27,7 @@ public class UsuarioService {
 
     @Transactional(readOnly = true)
     public List<UsuarioDTO> findAll() {
-        return usuarioRepository.findAll().stream()
+        return usuarioRepository.findAllConPerfil().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
